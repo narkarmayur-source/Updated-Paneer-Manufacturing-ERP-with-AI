@@ -26,41 +26,67 @@ You provide precise, practical, actionable advice on:
 6. MPCB effluent / whey handling and CIP sanitization.
 Answer concisely in a direct, professional, plant-floor friendly tone. You can reply in English, Hindi, or Marathi based on the query.`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                text: `${systemPrompt}\n\nOperator Query: ${message}`
-              }
-            ]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 600,
+    const requestBody = JSON.stringify({
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: `${systemPrompt}\n\nOperator Query: ${message}`
+            }
+          ]
         }
-      })
+      ],
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 600,
+      }
     });
 
-    if (!response.ok) {
-      return NextResponse.json({
-        reply: `Error from Gemini API: ${response.status}. Please verify your GEMINI_API_KEY in Vercel.`
-      }, { status: 500 });
+    // Array of candidate model endpoints to automatically avoid 404
+    const modelCandidates = [
+      'gemini-1.5-flash-latest',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+      'gemini-1.5-pro-latest'
+    ];
+
+    let lastError = '';
+    for (const model of modelCandidates) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: requestBody
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const replyText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (replyText) {
+            return NextResponse.json({ reply: replyText });
+          }
+        } else {
+          const errStatus = response.status;
+          const errText = await response.text();
+          lastError = `Status ${errStatus}: ${errText}`;
+          // If 404, try the next model candidate
+          if (errStatus === 404) {
+            continue;
+          } else {
+            break;
+          }
+        }
+      } catch (e: any) {
+        lastError = e.message;
+      }
     }
 
-    const data = await response.json();
-    const replyText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "No response received from Gemini.";
-
-    return NextResponse.json({ reply: replyText });
+    return NextResponse.json({
+      reply: `Gemini API returned error: ${lastError}. Please check that your GEMINI_API_KEY in Vercel is valid.`
+    }, { status: 500 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
