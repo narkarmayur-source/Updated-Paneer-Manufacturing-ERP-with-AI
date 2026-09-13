@@ -116,6 +116,7 @@ export default function PaneerERPCommandCenter() {
   const totRev = dispatches.reduce((a, b) => a + b.amt, 0);
 
   return (
+    <>
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl">
@@ -374,4 +375,4 @@ export default function PaneerERPCommandCenter() {
             <form onSubmit={addBatch} className="space-y-2 text-xs">
               <div>
                 <label className="text-slate-400 block">Milk Volume (L)</label>
-                <select className="w-full bg-slate-950 border border-slate-
+                <select className="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-white" value={bMilk} onChange={e => setBMilk(Number(e.target.value))}>
