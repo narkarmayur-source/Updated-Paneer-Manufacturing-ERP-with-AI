@@ -3,21 +3,16 @@
 import React, { useState } from 'react';
 import { 
   Activity, 
-  AlertTriangle, 
   CheckCircle2, 
   Cpu, 
-  Database, 
   Droplets, 
-  FileText,
   Gauge, 
   Layers, 
   Plus,
   Printer, 
-  ShieldCheck, 
   Thermometer, 
   TrendingUp, 
   Truck, 
-  Users, 
   X,
   Zap 
 } from 'lucide-react';
@@ -71,7 +66,6 @@ export default function PaneerERPCommandCenter() {
   const [showDispatchModal, setShowDispatchModal] = useState(false);
   const [lastReceipt, setLastReceipt] = useState<MilkIntakeRecord | null>(null);
 
-  // Form input states
   const [supplierName, setSupplierName] = useState('Barad Dairy Farmer Producer Co.');
   const [village, setVillage] = useState('Barad');
   const [milkType, setMilkType] = useState('BUFFALO');
@@ -262,7 +256,7 @@ export default function PaneerERPCommandCenter() {
     const newDispatch: DispatchRecord = {
       id: `DSP-${String(dispatchList.length + 1).padStart(2, '0')}`,
       customerName: custName,
-      route: dispatchRoute.replace('_', ' '),
+      route: dispatchRoute.replace(/_/g, ' '),
       quantityKg: Number(dispatchKg),
       ratePerKg: Number(dispatchRate),
       totalAmount: totalAmt,
@@ -742,3 +736,140 @@ export default function PaneerERPCommandCenter() {
                 </span>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>Optimal Coagulation: <strong className="text-white">{batchFat > 5.5 ? 74.0 : 73.0}°C</strong></div>
+                  <div>Citric Acid Dosing: <strong className="text-white">{Number(((batchMilkLiters * 2.08) / 1000).toFixed(2))} kg</strong></div>
+                  <div>Target Pressing: <strong className="text-white">2.85 Bar (20 min)</strong></div>
+                  <div>Expected Output: <strong className="text-emerald-400">{Number(((batchMilkLiters * 1.030 * ((batchFat * 1.86) + (batchSNF * 0.94) - 0.42)) / 100).toFixed(1))} kg</strong></div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button 
+                  type="button" 
+                  onClick={() => setShowBatchModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-lg shadow-emerald-600/30"
+                >
+                  Start Heating & Launch Batch
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL 3: NEW DISPATCH --- */}
+      {showDispatchModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2 font-bold text-white text-lg">
+                <Truck className="w-5 h-5 text-purple-400" />
+                <span>Schedule New B2B Sales Dispatch</span>
+              </div>
+              <button onClick={() => setShowDispatchModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddDispatch} className="space-y-3.5 text-xs">
+              <div>
+                <label className="text-slate-400 block mb-1">Customer / Hotel / Resort Name</label>
+                <input 
+                  type="text" 
+                  value={custName} 
+                  onChange={e => setCustName(e.target.value)} 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">Route Cluster</label>
+                  <select 
+                    value={dispatchRoute} 
+                    onChange={e => setDispatchRoute(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white"
+                  >
+                    <option value="ROUTE_ALPHA_BARAMATI">Route Alpha (Baramati)</option>
+                    <option value="ROUTE_BETA_SATARA">Route Beta (Satara / Shirwal)</option>
+                    <option value="ROUTE_GAMMA_WAI_MAHABALESHWAR">Route Gamma (Wai / Mahabaleshwar)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Weight (kg)</label>
+                  <input 
+                    type="number" 
+                    value={dispatchKg} 
+                    onChange={e => setDispatchKg(Number(e.target.value))} 
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Agreed Rate per kg (₹)</label>
+                <input 
+                  type="number" 
+                  value={dispatchRate} 
+                  onChange={e => setDispatchRate(Number(e.target.value))} 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white"
+                  required
+                />
+              </div>
+
+              <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl flex justify-between items-center">
+                <span className="text-slate-400">Total Invoice Amount:</span>
+                <span className="text-emerald-400 font-bold text-base font-mono">₹{(dispatchKg * dispatchRate).toLocaleString()}</span>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button 
+                  type="button" 
+                  onClick={() => setShowDispatchModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold shadow-lg shadow-purple-600/30"
+                >
+                  Confirm & Allocate to Van
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- THERMAL RECEIPT SLIP POPUP --- */}
+      {lastReceipt && (
+        <div className="fixed bottom-4 right-4 bg-slate-900 border border-emerald-500/50 p-4 rounded-xl shadow-2xl z-50 max-w-sm space-y-2">
+          <div className="flex justify-between items-center border-b border-slate-800 pb-1.5">
+            <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4" /> Intake Recorded: {lastReceipt.id}
+            </span>
+            <button onClick={() => setLastReceipt(null)} className="text-slate-400 hover:text-white">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="text-xs space-y-1 text-slate-300">
+            <div>Supplier: <strong>{lastReceipt.supplierName}</strong></div>
+            <div>Volume: <strong>{lastReceipt.liters} L</strong> ({lastReceipt.fatPercent}% Fat | {lastReceipt.snfPercent}% SNF)</div>
+            <div>Rate: <strong>₹{lastReceipt.ratePerLiter.toFixed(2)}/L</strong> | Payout: <strong className="text-emerald-400 font-mono">₹{lastReceipt.totalPayout.toLocaleString()}</strong></div>
+          </div>
+          <button 
+            onClick={() => window.print()}
+            className="w-full mt-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5"
+          >
+            <Printer className="w-3.5 h-3.5" /> Print Thermal Slip
+          </button>
+        </div>
+      )}
