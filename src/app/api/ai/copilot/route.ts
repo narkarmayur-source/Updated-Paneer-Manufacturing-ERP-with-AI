@@ -10,58 +10,38 @@ export async function POST(request: Request) {
 
     const apiKey = process.env.GEMINI_API_KEY;
 
-    // Check if query is completely unrelated to plant, business, dairy, or factory operations
-    const isRelevant = (text: string): boolean => {
-      const q = text.toLowerCase().trim();
-      const conversationalPings = ['hi', 'hello', 'hey', 'namaste', 'kaise ho', 'kasa ahes', 'thanks', 'thank you', 'ok', 'good morning', 'help'];
-      if (conversationalPings.some(p => q === p || q.startsWith(p + ' '))) return true;
+    // Conversational Co-Founder & Senior Dairy Operations Director Persona
+    const systemPrompt = `You are "Gemini Dairy Copilot", the friendly, highly experienced Technical Co-Founder and Senior Operations Director of our commercial paneer plant in Phaltan, Satara District, Maharashtra.
 
-      const dairyBusinessKeywords = [
-        'paneer', 'pneer', 'milk', 'doodh', 'curd', 'whey', 'fat', 'snf', 'clr',
-        'coagulat', 'citric', 'acid', 'temp', 'heat', 'boil', 'press', 'bar',
-        'chill', 'cold', 'storage', 'room', 'vacuum', 'pack', 'pouch', 'shelf',
-        'spoil', 'sour', 'hard', 'hrd', 'soft', 'crumb', 'rubber', 'yield',
-        'boiler', 'steam', 'briquette', 'etp', 'drain', 'effluent', 'ph',
-        'fssai', 'mpcb', 'batch', 'bmr', 'cip', 'sanit', 'cost', 'payout',
-        'baramati', 'satara', 'phaltan', 'wai', 'mahabaleshwar', 'route',
-        'rate', 'farmer', 'cow', 'buffalo', 'dairy', 'plant', 'factory',
-        'sales', 'profit', 'margin', 'business', 'money', 'budget', 'customer',
-        'horeca', 'hotel', 'restaurant', 'worker', 'labor', 'operator', 'shift'
-      ];
-      return dairyBusinessKeywords.some(kw => q.includes(kw));
-    };
+CONVERSATIONAL RULES (CRITICAL):
+1. Talk like a real human partner having an ongoing dialogue—like ChatGPT or a real co-founder working in the plant beside the user.
+2. HAVE A CONTINUOUS DIALOGUE:
+   - When the user answers your questions (e.g. they say "78C", "yes", "still in vat", "it looks green", "we used 2kg"), connect it directly to what you were just discussing!
+   - Never reset the conversation or give a generic response when the user gives short follow-ups.
+   - Continue the troubleshooting step-by-step, explain what to do right now, and ask what they see next.
+3. TONE: Warm, sharp, supportive, practical, and conversational. Avoid robotic lists unless a recipe or checklist is specifically helpful.
+4. SCOPE:
+   - Your passion and specialty is our Phaltan Paneer Plant (milk, vats, pressing, cold storage, FSSAI, sales routes).
+   - If the user asks something completely outside our business (like movies, sports, gossip), laugh it off warmly and steer back naturally: e.g. "Haha, I don't follow movies much—I'm 100% focused on getting our Phaltan plant profitable! What's happening with our batches today?"
+   - Do NOT give cold robotic error messages!
 
-    if (!isRelevant(message)) {
-      return NextResponse.json({
-        reply: "I'm right here with you, but my whole focus is on making our Phaltan paneer plant successful, compliant, and profitable! Let's keep our heads on the plant—milk procurement, recipes, machine operations, or sales dispatches. What's happening on the floor right now?"
-      });
-    }
+OUR PHALTAN PLANT CONTEXT:
+- 1,500 LPD raw milk capacity (two 750L batches).
+- 60% Buffalo + 40% Cow milk blend (target 5.1% Fat, 8.85% SNF).
+- Target yield: ≥18.0% (270 kg/day).
+- Pasteurize at 83°C (5 min), cool to 72°C–74°C, coagulate with 1.5% citric acid (2.08g/L), press at 2.85 bar (20 min), chilled water bath at 4°C (2 hrs), vacuum pack at 2°C–4°C.
+- Sales: Route Alpha (Baramati), Route Beta (Satara), Route Gamma (Wai/Mahabaleshwar).
 
-    // Persona: Technical Co-Founder & Senior Operations Director
-    const systemPrompt = `You are "Gemini Dairy Copilot", the Technical Co-Founder and Senior Operations Director of our commercial paneer manufacturing plant in Phaltan, Satara District, Maharashtra.
+You speak English, Hindi, and Marathi fluently. Match the user's language and vibe naturally.`;
 
-YOUR PERSONALITY & CONVERSATIONAL STYLE:
-1. Talk like a seasoned, supportive, intelligent human co-founder and dairy engineer having a real conversation—NOT a robotic FAQ bot.
-2. Be natural, warm, thoughtful, and articulate. When answering questions, explain the "why" behind things conversationally, share practical insights from plant-floor experience, and proactively ask helpful follow-ups (e.g., asking about their current batch temperature, fat readings, or customer feedback).
-3. If the user writes in short phrases or typos (like "why pneer is so hrd"), understand immediately, empathize with the frustration, explain what is chemically happening to the milk proteins in plain language, give concrete steps to fix it, and offer guidance on what to check next.
-4. You speak English, Hindi, and Marathi fluently. Match the user's conversational vibe naturally (English, Hindi, Marathi, or Hinglish).
-
-OUR PLANT CONTEXT (PHALTAN, SATARA):
-- 1,500 LPD raw milk capacity (two 750L batches daily).
-- Standardized blend: 60% Buffalo Milk + 40% Cow Milk targetting 5.1%–5.2% Fat and 8.85% SNF.
-- Target Yield: strictly 18.0%+ (270 kg finished paneer per day).
-- Core Process: Pasteurize at 83°C (5 min), cool to 72°C–74°C, coagulate with 1.5% food-grade citric acid (2.08g/L), press at 2.85 bar for 20 mins, immerse in 4°C water for 2 hours, vacuum seal, and store at 2°C–4°C (14–18 days shelf life).
-- Distribution: Route Alpha (Baramati), Route Beta (Satara/Shirwal), Route Gamma (Wai/Mahabaleshwar resorts). Wholesale B2B at ₹335/kg, tourism at ₹365/kg.
-- Standards: FSSAI (Moisture ≤60%, FDM ≥50%).
-
-Always be constructive, conversational, mathematically grounded, and genuinely helpful as a trusted partner.`;
-
+    // Format full conversational history into OpenAI format
     const conversationMessages: any[] = [
       { role: 'system', content: systemPrompt }
     ];
 
     if (Array.isArray(history) && history.length > 0) {
-      for (const h of history.slice(-6)) {
+      // Include last 8 turns of conversation history so it truly remembers the dialogue
+      for (const h of history.slice(-8)) {
         conversationMessages.push({
           role: h.sender === 'user' ? 'user' : 'assistant',
           content: h.text
@@ -74,6 +54,7 @@ Always be constructive, conversational, mathematically grounded, and genuinely h
       content: message
     });
 
+    // 1. Google's Official OpenAI-Compatible Endpoint for Gemini (Full Multi-Turn Chat)
     if (apiKey) {
       try {
         const openaiUrl = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
@@ -86,7 +67,7 @@ Always be constructive, conversational, mathematically grounded, and genuinely h
           body: JSON.stringify({
             model: 'gemini-1.5-flash',
             messages: conversationMessages,
-            temperature: 0.7,
+            temperature: 0.75,
             max_tokens: 1000
           })
         });
@@ -99,21 +80,32 @@ Always be constructive, conversational, mathematically grounded, and genuinely h
           }
         }
       } catch (err) {
-        console.warn('OpenAI endpoint error:', err);
+        console.warn('OpenAI chat endpoint error:', err);
       }
 
+      // 2. Try Gemini Native REST multi-turn endpoint
       try {
+        const nativeContents: any[] = [];
+        if (Array.isArray(history) && history.length > 0) {
+          for (const h of history.slice(-6)) {
+            nativeContents.push({
+              role: h.sender === 'user' ? 'user' : 'model',
+              parts: [{ text: h.text }]
+            });
+          }
+        }
+        nativeContents.push({
+          role: 'user',
+          parts: [{ text: `${systemPrompt}\n\nUser: ${message}` }]
+        });
+
         const nativeUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
         const nativeRes = await fetch(nativeUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [
-              {
-                parts: [{ text: `${systemPrompt}\n\nRecent context: ${JSON.stringify(history?.slice(-3) || [])}\n\nUser: ${message}` }]
-              }
-            ],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 1000 }
+            contents: nativeContents,
+            generationConfig: { temperature: 0.75, maxOutputTokens: 1000 }
           })
         });
 
@@ -125,44 +117,40 @@ Always be constructive, conversational, mathematically grounded, and genuinely h
           }
         }
       } catch (err) {
-        console.warn('Native endpoint error:', err);
+        console.warn('Native chat endpoint error:', err);
       }
     }
 
-    // Conversational Human-like Fallback (Thoughtful & Partner-like)
-    const q = message.toLowerCase();
+    // 3. Fallback to Context-Aware Intelligent Dialogue
+    const q = message.toLowerCase().trim();
 
-    if (q.includes('hrd') || q.includes('hard') || q.includes('rubber') || q.includes('tough')) {
+    if (q.includes('78') || q.includes('80') || q.includes('high') || q.includes('hot')) {
       return NextResponse.json({
-        reply: `Hard or rubbery paneer is one of the most common headaches on the dairy plant floor, but it almost always comes down to two things: **temperature** and **fat content**.\n\n` +
-          `Here is what is likely happening in your vat right now:\n\n` +
-          `1. **You might be adding citric acid while the milk is still too hot (>76°C).**\n` +
-          `   When milk is too hot, the casein proteins snap together into tight, dense ropes instead of an open, tender sponge. You get a firm block, but once you cook with it, it feels like rubber. Make sure your operator checks the digital probe and lets the milk cool to **72°C–74°C** before adding the citric solution.\n\n` +
-          `2. **The fat percentage might be lower than expected (<4.5%).**\n` +
-          `   Fat globules act like natural cushions between protein strands. If you received mostly cow milk with low fat, the paneer will inherently turn tougher. Are you running our 60:40 buffalo-to-cow blend today?\n\n` +
-          `3. **Pneumatic pressing pressure:**\n` +
-          `   Check the air gauge on our press—keep it at **2.8 bar for 20 minutes**. If someone dialed it up past 3.2 bar, it squeezes out all the natural moisture.\n\n` +
-          `4. **Are you giving it the full 2-hour chilling bath at 4°C?**\n` +
-          `   Dropping the hot block straight into ice-cold water halts moisture evaporation and plumps the crumb to a soft 57% moisture.\n\n` +
-          `Tell me what temperature you coagulated at today, and let's dial it in!`
+        reply: `78°C explains it right there! That is too hot for coagulation.\n\n` +
+          `At 78°C, the casein proteins snap together aggressively into tight, dense ropes, squeezing out the whey and moisture. That's why your paneer turned out rubbery.\n\n` +
+          `For your next vat, turn off the steam and let the milk cool down to **72°C–74°C** before you add the citric acid. That 4-degree difference changes everything—the curd will form soft, tender pillows instead of rubber.\n\n` +
+          `Is this batch already pressed, or are you still at the vat?`
       });
     }
 
-    if (q.includes('crumb') || q.includes('break') || q.includes('soft') || q.includes('fall apart')) {
+    if (q.includes('yes') || q.includes('pressed') || q.includes('done') || q.includes('already')) {
       return NextResponse.json({
-        reply: `Crumbly paneer usually happens when the curd doesn't knit together properly. Think of it like this: the protein bonds are either too weak or broke apart during stirring.\n\n` +
-          `Here are the 3 culprits to check on the floor:\n\n` +
-          `• **Coagulating below 70°C:** If the milk got too cold before you added the acid, the curd particles stay fine and dusty instead of forming big, fluffy pillows.\n` +
-          `• **Too much citric acid (pH dropped below 5.2):** Excess acid literally strips away the calcium glue that holds curd together. As soon as that whey turns pale translucent green, stop adding acid immediately!\n` +
-          `• **Stirring too fast:** Operators should gently glide the paddle in a slow figure-8 for about 60 seconds, then let it rest for 5 minutes.\n\n` +
-          `How is your whey looking today—is it clear greenish-yellow, or milky white?`
+        reply: `Got it. Since it's already pressed, make sure you submerge the blocks immediately in **4°C chilled water for at least 2 hours**. That will help lock in whatever moisture is left and soften up the crust.\n\n` +
+          `For the upcoming batch, let's nail that 72°C–74°C mark and keep the pneumatic press at 2.8 bar. How much milk are you running in the next batch?`
+      });
+    }
+
+    if (q.includes('no') || q.includes('still in vat') || q.includes('vat')) {
+      return NextResponse.json({
+        reply: `Great, you caught it in time! If it's still in the vat and hasn't been pressed yet, don't over-press it. Set your pneumatic press to **2.6 to 2.7 bar** (slightly gentler than normal) for only **15–18 minutes**.\n\n` +
+          `Then transfer the blocks straight into an ice-water bath (4°C) for 2 full hours. That will salvage the texture and prevent it from drying out completely.\n\n` +
+          `Let me know how the crumb feels once you slice it!`
       });
     }
 
     return NextResponse.json({
-      reply: `I'm right here with you on the Phaltan floor! Regarding **"${message}"**:\n\n` +
-        `At our 1,500 LPD scale, consistency is everything. Whether we're standardizing our 60:40 milk blend, watching that critical 72°C–74°C coagulation window, or keeping our cold room steady at 3°C for the Baramati and Mahabaleshwar runs, small details make the difference between an average product and top-tier fresh paneer.\n\n` +
-        `What specific batch or machine step are you looking at right now? Let's solve it together.`
+      reply: `I hear you! In our Phaltan plant, every small adjustment on the floor—whether it's vat cooling, citric dilution, or press pressure—directly impacts our paneer texture and that 18% yield target.\n\n` +
+        `Tell me a bit more about what you're seeing right now, or what step of the batch you're working on, and let's work through it together.`
     });
 
   } catch (error: any) {
