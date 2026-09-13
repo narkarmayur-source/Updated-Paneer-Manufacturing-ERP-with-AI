@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { runYieldOptimizationAI } from '@/lib/ai/yield-optimizer';
 import { computePaneerMassBalance } from '@/lib/calculations/dairy-math';
 
-let productionBatches = [
+let productionBatches: any[] = [
   {
     id: "BATCH-20260914-01",
     batchCode: "PB-01",
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
       coagulationTempC: aiParams.optimalCoagulationTempC,
       citricAcidKg: aiParams.recommendedCitricAcidKg,
       targetPaneerKg: massBalance.expectedPaneerKg,
-      actualPaneerKg: null,
+      actualPaneerKg: 0,
       yieldPercentage: aiParams.predictedYieldPercentage,
       status: "HEATING",
       aiInsights: aiParams.aiExplanation,
