@@ -1,0 +1,246 @@
+// Prisma Schema for Phaltan Paneer Manufacturing AI ERP
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PLANT_MANAGER
+  DAIRY_CHEMIST
+  OPERATOR
+  BOILER_TECH
+  SALES_EXECUTIVE
+  ACCOUNTS_ADMIN
+  SUPER_ADMIN
+}
+
+enum MilkType {
+  BUFFALO
+  COW
+  MIXED_STANDARDIZED
+}
+
+enum QualityStatus {
+  ACCEPTED
+  REJECTED
+  CONDITIONAL
+}
+
+enum BatchStatus {
+  SCHEDULED
+  HEATING
+  COAGULATING
+  PRESSING
+  CHILLING
+  SLICING_PACKAGING
+  COLD_STORAGE
+  COMPLETED
+  ABORTED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  DISPATCHED
+  DELIVERED
+  CANCELLED
+}
+
+enum RouteCluster {
+  ROUTE_ALPHA_BARAMATI
+  ROUTE_BETA_SATARA_SHIRWAL
+  ROUTE_GAMMA_WAI_MAHABALESHWAR
+  ROUTE_LOCAL_PHALTAN
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  role      Role     @default(OPERATOR)
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  batches   ProductionBatch[]
+}
+
+model Supplier {
+  id              String       @id @default(uuid())
+  code            String       @unique
+  name            String
+  type            String       // FPC, BMC, INDIVIDUAL_FARMER
+  village         String       // Barad, Taradgaon, Lonand, Phaltan
+  contactNumber   String
+  bankAccount     String?
+  ifscCode        String?
+  baseRateFat     Float        // Base rate per kg fat
+  baseRateSNF     Float        // Base rate per kg SNF
+  milkIntakes     MilkIntake[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model MilkIntake {
+  id              String        @id @default(uuid())
+  intakeNumber    String        @unique
+  supplierId      String
+  supplier        Supplier      @relation(fields: [supplierId], references: [id])
+  timestamp       DateTime      @default(now())
+  milkType        MilkType      @default(MIXED_STANDARDIZED)
+  quantityLiters  Float
+  fatPercentage   Float
+  snfPercentage   Float
+  clr             Float         // Corrected Lactometer Reading
+  temperatureC    Float
+  acidityLactic   Float         // % Lactic Acid
+  adulterationNeg Boolean       @default(true) // Negative for starch, urea, detergent
+  ratePerLiter    Float
+  totalAmount     Float
+  status          QualityStatus @default(ACCEPTED)
+  dockInspector   String
+  batchId         String?
+  batch           ProductionBatch? @relation(fields: [batchId], references: [id])
+  createdAt       DateTime      @default(now())
+}
+
+model ProductionBatch {
+  id                   String        @id @default(uuid())
+  batchCode            String        @unique // E.g., PB-20260914-01
+  scheduledDate        DateTime      @default(now())
+  milkVolumeLiters     Float
+  targetPaneerKg       Float
+  actualPaneerKg       Float?
+  yieldPercentage      Float?        // Calculated actual yield (target: >=18.0%)
+  
+  // Quality & Process Parameters
+  blendFatPercent      Float
+  blendSNFPercent      Float
+  pasteurizationTempC  Float         @default(83.0) // 82-85 C
+  pasteurizationHoldMin Int          @default(5)
+  coagulationTempC     Float         @default(73.0) // 72-74 C
+  citricAcidDoseKg     Float
+  coagulationPh        Float         @default(5.32) // 5.30-5.35
+  pressPressureBar     Float         @default(2.8)  // 2.5-3.0 bar
+  pressDurationMin     Int           @default(20)
+  chillingWaterTempC   Float         @default(4.0)  // 2-4 C
+  chillingDurationMin  Int           @default(120)
+  
+  // AI Optimization Log
+  aiRecommendedTemp    Float?
+  aiRecommendedCitric  Float?
+  aiPredictedYield     Float?
+  aiYieldVariance      Float?
+  
+  status               BatchStatus   @default(SCHEDULED)
+  operatorId           String
+  operator             User          @relation(fields: [operatorId], references: [id])
+  milkIntakes          MilkIntake[]
+  labTests             QualityLabTest[]
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+}
+
+model QualityLabTest {
+  id                 String          @id @default(uuid())
+  batchId            String
+  batch              ProductionBatch @relation(fields: [batchId], references: [id])
+  testTimestamp      DateTime        @default(now())
+  moisturePercent    Float           // FSSAI Max 60.0%
+  fatDryBasisPercent Float           // FSSAI Min 50.0%
+  coliformCount      Int             // Target < 10 CFU/g
+  totalPlateCount    Int             // Target < 30,000 CFU/g
+  yeastMouldCount    Int             // Target < 50 CFU/g
+  pathogensAbsent    Boolean         @default(true) // Salmonella, Listeria, E. coli
+  fssaiCompliant     Boolean         @default(true)
+  testedBy           String
+  remarks            String?
+}
+
+model ColdChainTelemetry {
+  id             String       @id @default(uuid())
+  sensorId       String
+  locationZone   String       // COLD_ROOM_01, CHILLING_TANK_01, VENDOR_VAN_01
+  temperatureC   Float
+  humidityRh     Float?
+  timestamp      DateTime     @default(now())
+  alertTriggered Boolean      @default(false)
+  alertMessage   String?
+}
+
+model Customer {
+  id                 String       @id @default(uuid())
+  code               String       @unique
+  businessName       String
+  contactPerson      String
+  channelType        String       // HORECA, WHOLESALE, RETAIL_CHAIN
+  locationCity       String       // Phaltan, Baramati, Satara, Wai, Mahabaleshwar
+  routeCluster       RouteCluster
+  phone              String
+  creditLimitDays    Int          @default(7)  // Max 7-14 days
+  creditLimitAmount  Float        @default(50000.0)
+  currentOutstanding Float        @default(0.0)
+  isBlockedForCredit Boolean      @default(false)
+  orders             SalesOrder[]
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+}
+
+model SalesOrder {
+  id              String       @id @default(uuid())
+  orderNumber     String       @unique
+  customerId      String
+  customer        Customer     @relation(fields: [customerId], references: [id])
+  orderDate       DateTime     @default(now())
+  deliveryDate    DateTime
+  sku1kgBulkQty   Int          @default(0) // 1kg HORECA vacuum pack
+  sku2kgBulkQty   Int          @default(0) // 2kg Bulk blocks
+  sku200gRetailQty Int         @default(0) // 200g Consumer packs
+  totalWeightKg   Float
+  unitPricePerKg  Float
+  totalAmount     Float
+  status          OrderStatus  @default(PENDING)
+  dispatchRoute   RouteCluster
+  dispatchedAt    DateTime?
+  deliveredAt     DateTime?
+  paymentReceived Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model InventoryItem {
+  id            String   @id @default(uuid())
+  sku           String   @unique
+  name          String
+  category      String   // RAW_MATERIAL, PACKAGING, CONSUMABLE, FINISHED_GOODS
+  currentStock  Float
+  unit          String   // KG, LITERS, NOS, ROLLS
+  reorderLevel  Float
+  unitCost      Float
+  updatedAt     DateTime @updatedAt
+}
+
+model DailyFinancialLedger {
+  id                 String   @id @default(uuid())
+  date               DateTime @unique
+  milkPurchasedLiters Float
+  milkExpense        Float
+  productionKg       Float
+  laborCost          Float
+  electricityCost    Float
+  boilerFuelCost     Float
+  packagingCost      Float
+  logisticsCost      Float
+  otherExpenses      Float
+  totalOperatingCost Float
+  grossRevenue       Float
+  netOperatingProfit Float
+  costPerKgPaneer    Float
+  netMarginPercent   Float
+  createdAt          DateTime @default(now())
+}
