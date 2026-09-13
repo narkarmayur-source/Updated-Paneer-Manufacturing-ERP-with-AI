@@ -3,13 +3,30 @@
 import React, { useState } from 'react';
 import {
   Activity, CheckCircle2, Cpu, Droplets, Gauge,
-  Layers, Plus, Thermometer, TrendingUp, Truck, X
+  Layers, Plus, Send, Sparkles, Thermometer,
+  TrendingUp, Truck, X
 } from 'lucide-react';
+
+interface ChatMessage {
+  sender: 'user' | 'gemini';
+  text: string;
+}
 
 export default function PaneerERPCommandCenter() {
   const [showMilk, setShowMilk] = useState(false);
   const [showBatch, setShowBatch] = useState(false);
   const [showDsp, setShowDsp] = useState(false);
+
+  // Gemini Copilot State
+  const [showChat, setShowChat] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      sender: 'gemini',
+      text: 'Hello! I am your AI Dairy Plant Copilot. Ask me anything about milk standardization, coagulation setpoints, pneumatic pressing, or troubleshooting for your Phaltan facility.'
+    }
+  ]);
 
   const [sup, setSup] = useState('Barad Dairy FPC');
   const [liters, setLiters] = useState(450);
@@ -47,10 +64,7 @@ export default function PaneerERPCommandCenter() {
 
   const addIntake = (e: React.FormEvent) => {
     e.preventDefault();
-    setIntakes([
-      { id: `MI-${intakes.length + 101}`, name: sup, l: Number(liters), f: Number(fat), s: Number(snf), r: curRate, pay: curPay },
-      ...intakes
-    ]);
+    setIntakes([{ id: `MI-${intakes.length + 101}`, name: sup, l: Number(liters), f: Number(fat), s: Number(snf), r: curRate, pay: curPay }, ...intakes]);
     setShowMilk(false);
   };
 
@@ -58,20 +72,38 @@ export default function PaneerERPCommandCenter() {
     e.preventDefault();
     const yld = Number(((bFat * 1.86) + (bSnf * 0.94) - 0.42).toFixed(2));
     const outKg = Number(((bMilk * 1.030 * yld) / 100).toFixed(1));
-    setBatches([
-      { id: `PB-${String(batches.length + 1).padStart(2, '0')}`, l: Number(bMilk), cTemp: bFat > 5.5 ? 74.0 : 73.0, citric: Number(((bMilk * 2.08) / 1000).toFixed(2)), out: outKg, yld, st: 'HEATING' },
-      ...batches
-    ]);
+    setBatches([{ id: `PB-${String(batches.length + 1).padStart(2, '0')}`, l: Number(bMilk), cTemp: bFat > 5.5 ? 74.0 : 73.0, citric: Number(((bMilk * 2.08) / 1000).toFixed(2)), out: outKg, yld, st: 'HEATING' }, ...batches]);
     setShowBatch(false);
   };
 
   const addDispatch = (e: React.FormEvent) => {
     e.preventDefault();
-    setDispatches([
-      { id: `D-${String(dispatches.length + 1).padStart(2, '0')}`, c: cust, r: route, kg: Number(dKg), amt: Math.round(dKg * dRate), st: 'SCHEDULED' },
-      ...dispatches
-    ]);
+    setDispatches([{ id: `D-${String(dispatches.length + 1).padStart(2, '0')}`, c: cust, r: route, kg: Number(dKg), amt: Math.round(dKg * dRate), st: 'SCHEDULED' }, ...dispatches]);
     setShowDsp(false);
+  };
+
+  const sendChatMessage = async (customPrompt?: string) => {
+    const textToSend = customPrompt || chatInput;
+    if (!textToSend.trim() || chatLoading) return;
+
+    const newMsgs: ChatMessage[] = [...messages, { sender: 'user', text: textToSend }];
+    setMessages(newMsgs);
+    setChatInput('');
+    setChatLoading(true);
+
+    try {
+      const res = await fetch('/api/ai/copilot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: textToSend }),
+      });
+      const data = await res.json();
+      setMessages([...newMsgs, { sender: 'gemini', text: data.reply || 'No response.' }]);
+    } catch {
+      setMessages([...newMsgs, { sender: 'gemini', text: 'Error connecting to Gemini Copilot.' }]);
+    } finally {
+      setChatLoading(false);
+    }
   };
 
   const totMilk = intakes.reduce((a, b) => a + b.l, 0);
@@ -79,7 +111,7 @@ export default function PaneerERPCommandCenter() {
   const totRev = dispatches.reduce((a, b) => a + b.amt, 0);
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 relative min-h-screen">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900 border border-slate-800 p-5 rounded-2xl">
         <div className="flex items-center gap-3">
@@ -134,7 +166,7 @@ export default function PaneerERPCommandCenter() {
         </div>
       </div>
 
-      {/* 3 Columns */}
+      {/* 3 Main Grid Columns */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Panel 1 */}
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3">
@@ -228,6 +260,83 @@ export default function PaneerERPCommandCenter() {
         </div>
       </div>
 
+      {/* Floating Gemini Copilot Button */}
+      <div className="fixed bottom-6 right-6 z-40">
+        <button
+          onClick={() => setShowChat(!showChat)}
+          className="flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold shadow-2xl shadow-indigo-600/40 border border-indigo-400/30 transition transform hover:scale-105"
+        >
+          <Sparkles className="w-5 h-5 animate-pulse text-amber-300" />
+          <span>Ask Gemini Copilot</span>
+        </button>
+      </div>
+
+      {/* Gemini Chat Drawer */}
+      {showChat && (
+        <div className="fixed bottom-20 right-6 w-96 max-w-[calc(100vw-2rem)] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 flex flex-col h-[480px] overflow-hidden">
+          <div className="p-3.5 bg-gradient-to-r from-slate-900 to-indigo-950 border-b border-slate-800 flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-300" />
+              <span className="font-bold text-white text-xs tracking-wide">Gemini Dairy Plant Copilot</span>
+            </div>
+            <button onClick={() => setShowChat(false)} className="text-slate-400 hover:text-white">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Quick Prompts */}
+          <div className="p-2 bg-slate-950 border-b border-slate-800 flex gap-1.5 overflow-x-auto text-[10px]">
+            <button onClick={() => sendChatMessage('Coagulation setpoint for 6.2% buffalo milk?')} className="whitespace-nowrap px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300">
+              Coag Temp?
+            </button>
+            <button onClick={() => sendChatMessage('Why is paneer crumbly and how to fix pressure?')} className="whitespace-nowrap px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300">
+              Crumbly paneer?
+            </button>
+            <button onClick={() => sendChatMessage('FSSAI moisture limit and testing protocol?')} className="whitespace-nowrap px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300">
+              FSSAI Rules?
+            </button>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 p-3 overflow-y-auto space-y-2.5 text-xs">
+            {messages.map((m, idx) => (
+              <div key={idx} className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`p-2.5 rounded-xl max-w-[85%] leading-relaxed ${m.sender === 'user' ? 'bg-blue-600 text-white' : 'bg-slate-950 border border-slate-800 text-slate-200'}`}>
+                  {m.text}
+                </div>
+              </div>
+            ))}
+            {chatLoading && (
+              <div className="flex justify-start">
+                <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 text-xs flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span>
+                  Gemini is analyzing dairy parameters...
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Input Footer */}
+          <div className="p-2.5 bg-slate-950 border-t border-slate-800 flex gap-2">
+            <input
+              type="text"
+              placeholder="Ask anything (English, Hindi, Marathi)..."
+              value={chatInput}
+              onChange={e => setChatInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && sendChatMessage()}
+              className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            />
+            <button
+              onClick={() => sendChatMessage()}
+              disabled={chatLoading}
+              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-50"
+            >
+              <Send className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Modal 1: Milk Intake */}
       {showMilk && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
@@ -311,7 +420,7 @@ export default function PaneerERPCommandCenter() {
       {/* Modal 3: Dispatch */}
       {showDsp && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xs w-full p-5 space-y-3">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xs w-full p-4 space-y-3">
             <div className="flex justify-between items-center border-b border-slate-800 pb-2 text-white font-bold text-xs">
               <span>New Sales Dispatch</span>
               <button onClick={() => setShowDsp(false)}><X className="w-4 h-4 text-slate-400" /></button>
